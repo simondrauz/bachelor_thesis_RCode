@@ -143,6 +143,7 @@ y_pred_train = fit_extract$y_pred_train
 save(fit, file = "fit_bayesian_psplines_gaussian_prior_integrated_functionalities_reparameterized_simulated_data.RData")
 
 stan_hist(fit, pars="alpha")
+stan_hist(fit, pars = "b_alpha")
 stan_hist(fit, pars="tau_X1")
 stan_hist(fit, pars="tau_X2")
 
@@ -175,6 +176,7 @@ for(i in 1:20) {
 }
 
 rstan::summary(fit, pars = "alpha")
+rstan::summary(fit, pars = "b_alpha")
 rstan::summary(fit, pars = "tau_X1")
 rstan::summary(fit, pars = "tau_X2")
 rstan::summary(fit, pars = "spline_coefficients_X1_penalized")
