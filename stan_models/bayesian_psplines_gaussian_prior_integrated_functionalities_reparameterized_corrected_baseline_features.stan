@@ -49,7 +49,6 @@ functions {
     real max_covariate = max(covariate_data);
     real spacing = (max_covariate - min_covariate) / (no_knots_extended -1);
     
-    print("Generate knot list for a covariate...");
 
     for (i in 1:(no_knots_extended)) {
       knots[i] = min_covariate + (i - 1) * spacing;
@@ -67,7 +66,7 @@ functions {
     //       knots = knots[-c(-1, length(knots))] = interior_knots
     //       degree = spline_degree
     //       intercept = FALSE
-    //    The approach is to generate a design matrix including an intercept and dropping it 
+    //    This is achieved by generating a design matrix including an intercept and dropping it 
     //    afterwards to get the design matrix without intercept
     //
     // INPUTS:
@@ -86,7 +85,6 @@ functions {
     vector[2 * spline_degree + no_knots_extended] ext_knots;
     vector[spline_degree + no_knots_extended] ext_knots_temp;
     
-    print("Generate spline design matrix for a covariate...")
     knots = generate_knots(covariate_data, no_knots_extended);
     ext_knots_temp = append_row(rep_vector(knots[1], spline_degree), to_vector(knots));
     ext_knots = append_row(ext_knots_temp, rep_vector(knots[no_knots_extended], spline_degree));
@@ -114,7 +112,6 @@ functions {
     //                          (equals no_interior_knots + spline_degree) 
     //
     matrix[no_basis, no_basis] penalty_matrix;
-    print("Generate penalty matrix for a covariate...")
     // Initialize all entries to zero
     for (i in 1:no_basis) {
       for (j in 1:no_basis) {
@@ -510,4 +507,29 @@ model {
 
     // Y ~ neg_binomial_2(mu, alpha);                                   // Likelihood
     target += neg_binomial_2_lpmf(Y | mu, alpha);  // Explicitly specifying the log-PMF
+}
+
+generated quantities {
+   int y_pred_train[no_data];
+   int y_pred_eval[no_data_eval];
+   vector[no_data_eval] mu_eval;
+   
+   mu_eval = exp(intercept + 
+               basis_X1_eval * polynomial_space_matrix_X1 * spline_coefficients_X1_non_penalized +
+               basis_X1_eval * random_effects_matrix_X1 * spline_coefficients_X1_penalized + 
+               basis_X2_eval * polynomial_space_matrix_X2 * spline_coefficients_X2_non_penalized +
+               basis_X2_eval * random_effects_matrix_X2 * spline_coefficients_X2_penalized +
+               basis_X3_eval * polynomial_space_matrix_X3 * spline_coefficients_X3_non_penalized +
+               basis_X3_eval * random_effects_matrix_X3 * spline_coefficients_X3_penalized +
+               basis_X4_eval * polynomial_space_matrix_X4 * spline_coefficients_X4_non_penalized +
+               basis_X4_eval * random_effects_matrix_X4 * spline_coefficients_X4_penalized +
+               basis_X5_eval * polynomial_space_matrix_X5 * spline_coefficients_X5_non_penalized +
+               basis_X5_eval * random_effects_matrix_X5 * spline_coefficients_X5_penalized);
+   
+   for (n in 1:no_data) {
+       y_pred_train[n] = neg_binomial_2_rng(mu[n], alpha);
+   }
+   for (n_eval in 1:no_data_eval) {
+       y_pred_eval[n_eval] = neg_binomial_2_rng(mu_eval[n_eval], alpha);
+   }
 }
