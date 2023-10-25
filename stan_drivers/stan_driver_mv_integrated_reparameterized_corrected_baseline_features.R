@@ -8,7 +8,7 @@ library('dplyr')
 
 # Load data
 df_raw <- read_parquet("C:/Users/Uwe Drauz/Documents/bachelor_thesis_local/personal_competition_data/temp/data_cm_features_allyears_ext.parquet")
-df_raw <- df_raw_expanded_feature_space_std
+# df_raw <- df_raw_expanded_feature_space_std
 
 df_raw <- df_raw[df_raw$ged_sb < 1000,]
 df_raw <- df_raw[df_raw$ged_sb > 0,]
@@ -18,14 +18,18 @@ df_raw <- df_raw[df_raw$country_id %in% countries_in_transition_ids, ]
 df_raw <- df_raw[df_raw$country_id %in% developing_countries_extended_without_LDC_ids, ]
 df_raw <- df_raw[df_raw$country_id %in% least_developed_countries_ids, ]
 
+neighbors_data <- read.csv("C:/Users/Uwe Drauz/Documents/bachelor_thesis_local/shared_competition_data/country_neighbors/fallback3_prod_country_country_month.csv")
+
 # Subset the dataframe for the specified columns
-df <- df_raw[-c(1:3), c('month_id', 'ged_sb', 'ged_sb_tlag_3', 'decay_ged_sb_5_tlag_3', 'decay_ged_sb_100_tlag_3', 'decay_ged_sb_500_tlag_3', 'wdi_sp_pop_totl_tlag_3')]
-df <- df_raw[-c(1:3),]
+# df <- df_raw[-c(1:3), c('month_id', 'ged_sb', 'ged_sb_tlag_3', 'decay_ged_sb_5_tlag_3', 'decay_ged_sb_100_tlag_3', 'decay_ged_sb_500_tlag_3', 'wdi_sp_pop_totl_tlag_3')]
+# df <- df_raw[-c(1:3),]
 
 # Remove Nan values from lags of countries which don't have obeservations for the first months and therefore missing lags at a later point
 # Remove NaN values from 'ged_sb_tlag_3' column
-df <- df[!is.na(df$ged_sb_tlag_3), ]
+# df <- df[!is.na(df$ged_sb_tlag_3), ]
 
+
+df <- df_raw
 # Define training_data and evaluation_data
 # Take training data till Oct. 2019
 df_train <- df[df$month_id <= 478, ]
@@ -80,7 +84,7 @@ intercept_gaussian_sigma <- 5
 tune_default <- 2000
 draws_default <- 1000
 target_accept_default <- 0.95
-no_chains_default <- 4
+no_chains_default <- 1
 
 # Data for the Stan model
 data_stan <- list(
@@ -123,6 +127,16 @@ data_stan <- list(
 
 sm = stan_model(file = "C:/Users/Uwe Drauz/RProjects/bachelor_thesis/stan_models/bayesian_psplines_gaussian_prior_integrated_functionalities_reparameterized_corrected_baseline_features.stan")
 
-fit <- sampling(sm, data=data_stan, iter=tune_default + draws_default, warmup=tune_default, chains=no_chains_default, control=list(adapt_delta = target_accept_default))
+fit <- sampling(sm, data=data_stan, iter=tune_default + draws_default, warmup=tune_default, chains=no_chains_default, control=list(adapt_delta = target_accept_default), refresh=1)
 fit_extract = rstan::extract(fit)
 save(fit, file = "fit_versionNew_gedsb_between_0_and_1000_excluding.RData")
+
+sm_parallel = stan_model(file = "C:/Users/Uwe Drauz/RProjects/bachelor_thesis/stan_models/baseline_features_spatialUnstr_temporal_enableParallel.stan")
+fit_parallel <- sampling(sm_parallel, data=data_stan, iter=tune_default + draws_default, warmup=tune_default, chains=1, control=list(adapt_delta = target_accept_default), refresh=1)
+
+
+sm_zinb_parallel = stan_model(file = "C:/Users/Uwe Drauz/RProjects/bachelor_thesis/stan_models/baseline_features_spatialUnstr_temporal_ZINB_enableParallel.stan")
+fit_zinb_parallel <- sampling(sm_zinb_parallel, data=data_stan, iter=tune_default + draws_default, warmup=tune_default, chains=1, control=list(adapt_delta = target_accept_default), refresh=50)
+
+
+
