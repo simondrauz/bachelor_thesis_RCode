@@ -608,10 +608,7 @@ generated quantities {
                basis_X4 * polynomial_space_matrix_X4 * spline_coefficients_X4_non_penalized +
                basis_X4 * random_effects_matrix_X4 * spline_coefficients_X4_penalized +
                basis_X5 * polynomial_space_matrix_X5 * spline_coefficients_X5_non_penalized +
-               basis_X5 * random_effects_matrix_X5 * spline_coefficients_X5_penalized +
-               spatial_data * spatial_coefficients +
-               temporal_data * temporal_coefficients
-               );
+               basis_X5 * random_effects_matrix_X5 * spline_coefficients_X5_penalized);
 
                
    mu_eval = exp(intercept + 
@@ -624,10 +621,7 @@ generated quantities {
                basis_X4_eval * polynomial_space_matrix_X4 * spline_coefficients_X4_non_penalized +
                basis_X4_eval * random_effects_matrix_X4 * spline_coefficients_X4_penalized +
                basis_X5_eval * polynomial_space_matrix_X5 * spline_coefficients_X5_non_penalized +
-               basis_X5_eval * random_effects_matrix_X5 * spline_coefficients_X5_penalized +
-               spatial_data_eval * spatial_coefficients +
-               temporal_data_eval * temporal_coefficients
-               );
+               basis_X5_eval * random_effects_matrix_X5 * spline_coefficients_X5_penalized);
 
    
    // Generate predictions for training data

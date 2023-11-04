@@ -277,7 +277,13 @@ data {
     
     real covariate_data_X5[no_data];              // compare covariate_X1 for X2 respectivly
     real covariate_data_X5_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
+
+    real covariate_data_X6[no_data];              // compare covariate_X1 for X2 respectivly
+    real covariate_data_X6_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
     
+    real covariate_data_X7[no_data];              // compare covariate_X1 for X2 respectivly
+    real covariate_data_X7_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
+
     int no_countries;
     matrix[no_data, no_countries] spatial_data;       // one hot encoding for countries
     matrix[no_data_eval, no_countries] spatial_data_eval ;
@@ -334,6 +340,18 @@ transformed data {
   matrix[no_basis, no_basis-random_walk_order] random_effects_matrix_X5;
   matrix[no_basis, random_walk_order] polynomial_space_matrix_X5;
  
+  matrix[no_data, no_basis] basis_X6;
+  matrix[no_data_eval, no_basis] basis_X6_eval;
+  matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X6;
+  matrix[no_basis, no_basis-random_walk_order] random_effects_matrix_X6;
+  matrix[no_basis, random_walk_order] polynomial_space_matrix_X6;
+
+  matrix[no_data, no_basis] basis_X7;
+  matrix[no_data_eval, no_basis] basis_X7_eval;
+  matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X7;
+  matrix[no_basis, no_basis-random_walk_order] random_effects_matrix_X7;
+  matrix[no_basis, random_walk_order] polynomial_space_matrix_X7;
+  
   // Generate design matrix of regression splines for covariate X1
   basis_X1 = generate_spline_basis_matrix(covariate_data_X1, spline_degree, no_interior_knots, no_data, no_basis);
   // Generate design matrix of evaluation regression splines for covariate X1
@@ -391,6 +409,28 @@ transformed data {
   // Generate polynominal space matrix of covarariate X2
   polynomial_space_matrix_X5 = generate_polynomial_space_matrix(no_basis, random_walk_order);
 
+  // Generate design matrix of regression splines for covariate X2
+  basis_X6 = generate_spline_basis_matrix(covariate_data_X6, spline_degree, no_interior_knots, no_data, no_basis); 
+  // Generate design matrix of evaluation regression splines for covariate X2
+  basis_X6_eval = generate_spline_basis_matrix(covariate_data_X6_eval, spline_degree, no_interior_knots, no_data_eval, no_basis);
+  // Generate difference matrix of covarariate X2
+  difference_matrix_first_order_X6 = generate_difference_matrix_first_order(no_basis);
+  // Generate random effects matrix of covarariate X2
+  random_effects_matrix_X6 = generate_random_effects_matrix(difference_matrix_first_order_X6);
+  // Generate polynominal space matrix of covarariate X2
+  polynomial_space_matrix_X6 = generate_polynomial_space_matrix(no_basis, random_walk_order);
+
+
+  // Generate design matrix of regression splines for covariate X2
+  basis_X7 = generate_spline_basis_matrix(covariate_data_X7, spline_degree, no_interior_knots, no_data, no_basis); 
+  // Generate design matrix of evaluation regression splines for covariate X2
+  basis_X7_eval = generate_spline_basis_matrix(covariate_data_X7_eval, spline_degree, no_interior_knots, no_data_eval, no_basis);
+  // Generate difference matrix of covarariate X2
+  difference_matrix_first_order_X7 = generate_difference_matrix_first_order(no_basis);
+  // Generate random effects matrix of covarariate X2
+  random_effects_matrix_X7 = generate_random_effects_matrix(difference_matrix_first_order_X7);
+  // Generate polynominal space matrix of covarariate X2
+  polynomial_space_matrix_X7 = generate_polynomial_space_matrix(no_basis, random_walk_order);
 }
 
 parameters {
@@ -418,6 +458,15 @@ parameters {
                                                                    // Penalized spline coefficients for X2
     vector[random_walk_order] spline_coefficients_X5_non_penalized;
                                                                    // Non-penalized spline coefficients for X2
+    vector[no_basis-random_walk_order] spline_coefficients_X6_penalized;                    
+                                                                   // Penalized spline coefficients for X2
+    vector[random_walk_order] spline_coefficients_X6_non_penalized;
+                                                                   // Non-penalized spline coefficients for X2
+
+    vector[no_basis-random_walk_order] spline_coefficients_X7_penalized;                    
+                                                                   // Penalized spline coefficients for X2
+    vector[random_walk_order] spline_coefficients_X7_non_penalized;
+                                                                   // Non-penalized spline coefficients for X2
     vector[no_countries] spatial_coefficients;                      // spatial coefficients
     vector[no_countries] spatial_coefficients_bernoulli;                      // spatial coefficients
 
@@ -429,6 +478,8 @@ parameters {
     real<lower=0> tau_squared_X3;                                          // Precision parameter for Gaussian random walk for covariate
     real<lower=0> tau_squared_X4;                                          // Precision parameter for Gaussian random walk for covariate
     real<lower=0> tau_squared_X5;                                          // Precision parameter for Gaussian random walk for covariate
+    real<lower=0> tau_squared_X6;                                          // Precision parameter for Gaussian random walk for covariate
+    real<lower=0> tau_squared_X7;                                          // Precision parameter for Gaussian random walk for covariate
 
     real<lower=0> alpha;                                           // Negative Binomial dispersion parameter
     real<lower=0> b_alpha;
@@ -456,6 +507,13 @@ transformed parameters {
     matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X5_penalized;
                                                                           // covariance matrix corresponding to penalized spline 
                                                                           // coefficients for X2   
+    matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X6_penalized;
+                                                                          // covariance matrix corresponding to penalized spline 
+                                                                          // coefficients for X2   
+    matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X7_penalized;
+                                                                          // covariance matrix corresponding to penalized spline 
+                                                                          // coefficients for X2   
+
     matrix[no_countries, no_countries] covariance_matrix_spatial_effects;
     matrix[no_countries, no_countries] covariance_matrix_spatial_effects_bernoulli;
 
@@ -472,6 +530,10 @@ transformed parameters {
              basis_X4 * random_effects_matrix_X4 * spline_coefficients_X4_penalized +
              basis_X5 * polynomial_space_matrix_X5 * spline_coefficients_X5_non_penalized +
              basis_X5 * random_effects_matrix_X5 * spline_coefficients_X5_penalized +
+             basis_X6 * polynomial_space_matrix_X6 * spline_coefficients_X6_non_penalized +
+             basis_X6 * random_effects_matrix_X6 * spline_coefficients_X6_penalized +
+             basis_X7 * polynomial_space_matrix_X7 * spline_coefficients_X7_non_penalized +
+             basis_X7 * random_effects_matrix_X7 * spline_coefficients_X7_penalized +
              spatial_data * spatial_coefficients +
              temporal_data * temporal_coefficients
              );
@@ -496,6 +558,13 @@ transformed parameters {
     covariance_matrix_X5_penalized = tau_squared_X5 * diag_matrix(rep_vector(1, no_basis-random_walk_order));       
                                                                     // Defining covariance matrix of penalized spline 
                                                                     // coefficients for X2 
+    covariance_matrix_X6_penalized = tau_squared_X6 * diag_matrix(rep_vector(1, no_basis-random_walk_order));       
+                                                                    // Defining covariance matrix of penalized spline 
+                                                                    // coefficients for X2 
+    covariance_matrix_X7_penalized = tau_squared_X7 * diag_matrix(rep_vector(1, no_basis-random_walk_order));       
+                                                                    // Defining covariance matrix of penalized spline 
+                                                                    // coefficients for X2 
+
     covariance_matrix_spatial_effects = tau_squared_spatial * diag_matrix(rep_vector(1, no_countries));
     covariance_matrix_spatial_effects_bernoulli = tau_squared_spatial_bernoulli * diag_matrix(rep_vector(1, no_countries));
 
@@ -511,6 +580,9 @@ model {
     tau_squared_X3 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X4 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X5 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
+    tau_squared_X6 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
+    tau_squared_X7 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
+
     tau_squared_spatial ~ inv_gamma(a_tau_squared_spatial, b_tau_squared_spatial);
     tau_squared_spatial_bernoulli ~ inv_gamma(a_tau_squared_spatial, b_tau_squared_spatial);
 
@@ -528,6 +600,10 @@ model {
                                                                      // Prior for spline coefficients for X2                                                                     
     spline_coefficients_X5_penalized ~ multi_normal(rep_vector(0, no_basis-random_walk_order), covariance_matrix_X5_penalized);
                                                                      // Prior for spline coefficients for X2  
+    spline_coefficients_X6_penalized ~ multi_normal(rep_vector(0, no_basis-random_walk_order), covariance_matrix_X6_penalized);
+                                                                     // Prior for spline coefficients for X2  
+    spline_coefficients_X7_penalized ~ multi_normal(rep_vector(0, no_basis-random_walk_order), covariance_matrix_X7_penalized);
+
     spatial_coefficients ~ multi_normal(rep_vector(0, no_countries), covariance_matrix_spatial_effects);
     spatial_coefficients_bernoulli ~ multi_normal(rep_vector(0, no_countries), covariance_matrix_spatial_effects_bernoulli);
 
@@ -563,6 +639,10 @@ generated quantities {
                basis_X4_eval * random_effects_matrix_X4 * spline_coefficients_X4_penalized +
                basis_X5_eval * polynomial_space_matrix_X5 * spline_coefficients_X5_non_penalized +
                basis_X5_eval * random_effects_matrix_X5 * spline_coefficients_X5_penalized +
+               basis_X6_eval * polynomial_space_matrix_X6 * spline_coefficients_X6_non_penalized +
+               basis_X6_eval * random_effects_matrix_X6 * spline_coefficients_X6_penalized +
+               basis_X7_eval * polynomial_space_matrix_X7 * spline_coefficients_X7_non_penalized +
+               basis_X7_eval * random_effects_matrix_X7 * spline_coefficients_X7_penalized +
                spatial_data_eval * spatial_coefficients +
                temporal_data_eval * temporal_coefficients
                );
