@@ -559,6 +559,8 @@ parameters {
     real<lower=0> tau_squared_spatial;
     real<lower=0> tau_squared_spatial_bernoulli;
     real<lower=0, upper=1> rho_spatial;
+    real<lower=0, upper=1> rho_spatial_bernoulli;
+
 
     real<lower=0> tau_squared_temporal;
 }
@@ -641,7 +643,7 @@ transformed parameters {
     
     precision_matrix_spatial_effects = (1/ tau_squared_spatial) * spatial_inv_identity_matrix * (diag_matrix(rep_vector(1, no_countries)) - rho_spatial * brooks_lemma_matrix);     
 
-    precision_matrix_spatial_effects_bernoulli = (1 / tau_squared_spatial_bernoulli) * spatial_inv_identity_matrix * (diag_matrix(rep_vector(1, no_countries)) - rho_spatial * brooks_lemma_matrix);
+    precision_matrix_spatial_effects_bernoulli = (1 / tau_squared_spatial_bernoulli) * spatial_inv_identity_matrix * (diag_matrix(rep_vector(1, no_countries)) - rho_spatial_bernoulli * brooks_lemma_matrix);
 
     covariance_matrix_temporal_effects = tau_squared_temporal * diag_matrix(rep_vector(1, no_seasons));
                                                              
@@ -663,6 +665,8 @@ model {
     
     // Set rho which is used in reparametrization of spatial_dependency_matrix (this is possibly prelimiinary)
     rho_spatial ~ beta(alpha_rho, beta_rho);
+    rho_spatial_bernoulli ~ beta(alpha_rho, beta_rho);
+
     
     tau_squared_temporal ~ inv_gamma(a_tau_squared_temporal, b_tau_squared_temporal);
     b_alpha ~ gamma(alpha_b_alpha, beta_b_alpha);
