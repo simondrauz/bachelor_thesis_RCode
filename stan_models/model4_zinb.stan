@@ -367,6 +367,9 @@ data {
     real beta_b_alpha;                                 // Scale parameter for Gamma of alpha
     real alpha_rho;                               // Parameters for Beta distribution of rho
     real beta_rho;
+    real alpha_pi;                               // Parameters for Beta distribution of pi
+    real beta_pi;
+
 }
 
 transformed data {
@@ -558,6 +561,7 @@ parameters {
     real<lower=0> tau_squared_spatial_bernoulli;
     real<lower=0, upper=1> rho_spatial;
     real<lower=0, upper=1> rho_spatial_bernoulli;
+    real<lower=0, upper=1> pi;                                                   // probability for structured zero
 
 
     real<lower=0> tau_squared_temporal;
@@ -565,7 +569,6 @@ parameters {
 
 transformed parameters {
     vector[no_data] mu;                                                   // Mean of Negative Binomial distribution
-    vector[no_data] pi;                                                   // probability for structured zero
     matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X1_penalized;
                                                                           // covariance matrix corresponding to penalized spline 
                                                                           // coefficients for X1
@@ -613,8 +616,6 @@ transformed parameters {
              );
                                                                     //taking exponential as a link function of a GAM
                                                                     
-    pi = inv_logit(spatial_data * spatial_coefficients_bernoulli);
-
 
                                                    //taking exponential as a link function of a GAM
     covariance_matrix_X1_penalized = tau_squared_X1 * diag_matrix(rep_vector(1, no_basis-random_walk_order));       
@@ -687,15 +688,17 @@ model {
     spatial_coefficients_bernoulli ~ multi_normal_prec(rep_vector(0, no_countries), precision_matrix_spatial_effects_bernoulli);
 
     temporal_coefficients ~ multi_normal(rep_vector(0, no_seasons), covariance_matrix_temporal_effects);
+
+    pi ~ beta(alpha_pi, beta_pi);
     
     // Log likelihood
     for (n in 1:no_data) {
       if (Y[n] == 0) {
-        target += log_sum_exp(log(pi[n]), 
-                            log1m(pi[n]) 
+        target += log_sum_exp(log(pi), 
+                            log1m(pi) 
                               + neg_binomial_2_lpmf(0 | mu[n], alpha));
       } else {
-        target += log1m(pi[n]) 
+        target += log1m(pi) 
                   + neg_binomial_2_lpmf(Y[n] | mu[n], alpha);
       }
     }
@@ -705,7 +708,6 @@ generated quantities {
    int y_pred_eval[no_data_eval];
 
    vector[no_data_eval] mu_eval;
-   vector[no_data_eval] pi_eval;
    
    mu_eval = exp(intercept + 
                basis_X1_eval * polynomial_space_matrix_X1 * spline_coefficients_X1_non_penalized +
@@ -725,17 +727,14 @@ generated quantities {
                spatial_data_eval * spatial_coefficients +
                temporal_data_eval * temporal_coefficients
                );
-               
-   pi_eval = inv_logit(spatial_data_eval * spatial_coefficients_bernoulli);
 
-   
    // Generate predictions for training data
    for (n in 1:no_data) {
-       y_pred_train[n] = bernoulli_rng(pi[n]) ? 0 : neg_binomial_2_rng(mu[n], alpha);
+       y_pred_train[n] = bernoulli_rng(pi) ? 0 : neg_binomial_2_rng(mu[n], alpha);
    }
    
    // Generate predictions for evaluation data
    for (n_eval in 1:no_data_eval) {
-       y_pred_eval[n_eval] = bernoulli_rng(pi_eval[n_eval]) ? 0 : neg_binomial_2_rng(mu_eval[n_eval], alpha);
+       y_pred_eval[n_eval] = bernoulli_rng(pi) ? 0 : neg_binomial_2_rng(mu_eval[n_eval], alpha);
    }
 }

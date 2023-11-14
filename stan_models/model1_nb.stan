@@ -302,8 +302,6 @@ data {
     real a_alpha;                                 // Shape parameter for Gamma of alpha
     real alpha_b_alpha;
     real beta_b_alpha;                                 // Scale parameter for Gamma of alpha
-    real intercept_mu;                            // Mean of intercept prior
-    real<lower=0> intercept_sigma;                // Standard deviation of intercept prior
 }
 
 transformed data {
@@ -559,7 +557,6 @@ transformed parameters {
 
 model {
   // Priors
-    intercept ~ normal(intercept_mu, intercept_sigma);               // Diffuse prior for intercept
     tau_squared_X1 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X2 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X3 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
