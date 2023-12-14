@@ -168,6 +168,7 @@ functions {
     
     return mat;
   }
+  
   matrix generate_difference_matrix_second_order(int no_basis);
   matrix generate_difference_matrix_second_order(int no_basis) {
     
@@ -230,6 +231,7 @@ functions {
     
     return mat;
   }
+  
   matrix generate_random_effects_matrix(matrix difference_matrix);
   matrix generate_random_effects_matrix(matrix difference_matrix) {
     //
@@ -275,7 +277,7 @@ data {
     
     real covariate_data_X5[no_data];              // compare covariate_X1 for X2 respectivly
     real covariate_data_X5_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
-    
+
     real covariate_data_X6[no_data];              // compare covariate_X1 for X2 respectivly
     real covariate_data_X6_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
     
@@ -335,7 +337,7 @@ transformed data {
   matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X5;
   matrix[no_basis, no_basis-random_walk_order] random_effects_matrix_X5;
   matrix[no_basis, random_walk_order] polynomial_space_matrix_X5;
-
+ 
   matrix[no_data, no_basis] basis_X6;
   matrix[no_data_eval, no_basis] basis_X6_eval;
   matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X6;
@@ -416,6 +418,7 @@ transformed data {
   // Generate polynominal space matrix of covarariate X2
   polynomial_space_matrix_X6 = generate_polynomial_space_matrix(no_basis, random_walk_order);
 
+
   // Generate design matrix of regression splines for covariate X2
   basis_X7 = generate_spline_basis_matrix(covariate_data_X7, spline_degree, no_interior_knots, no_data, no_basis); 
   // Generate design matrix of evaluation regression splines for covariate X2
@@ -426,7 +429,6 @@ transformed data {
   random_effects_matrix_X7 = generate_random_effects_matrix(difference_matrix_first_order_X7);
   // Generate polynominal space matrix of covarariate X2
   polynomial_space_matrix_X7 = generate_polynomial_space_matrix(no_basis, random_walk_order);
-
 }
 
 parameters {
@@ -449,12 +451,11 @@ parameters {
                                                                    // Penalized spline coefficients for X2
     vector[random_walk_order] spline_coefficients_X4_non_penalized;
                                                                    // Non-penalized spline coefficients for X2
-
+                                                                   // Non-penalized spline coefficients for X1
     vector[no_basis-random_walk_order] spline_coefficients_X5_penalized;                    
                                                                    // Penalized spline coefficients for X2
     vector[random_walk_order] spline_coefficients_X5_non_penalized;
                                                                    // Non-penalized spline coefficients for X2
-
     vector[no_basis-random_walk_order] spline_coefficients_X6_penalized;                    
                                                                    // Penalized spline coefficients for X2
     vector[random_walk_order] spline_coefficients_X6_non_penalized;
@@ -465,6 +466,8 @@ parameters {
     vector[random_walk_order] spline_coefficients_X7_non_penalized;
                                                                    // Non-penalized spline coefficients for X2
     vector[no_countries] spatial_coefficients;                      // spatial coefficients
+    vector[no_countries] spatial_coefficients_bernoulli;                      // spatial coefficients
+
     vector[no_seasons] temporal_coefficients;                       // temporal coefficients
 
     
@@ -475,15 +478,18 @@ parameters {
     real<lower=0> tau_squared_X5;                                          // Precision parameter for Gaussian random walk for covariate
     real<lower=0> tau_squared_X6;                                          // Precision parameter for Gaussian random walk for covariate
     real<lower=0> tau_squared_X7;                                          // Precision parameter for Gaussian random walk for covariate
-    
+
     real<lower=0> alpha;                                           // Negative Binomial dispersion parameter
     real<lower=0> b_alpha;
     real<lower=0> tau_squared_spatial;
+    real<lower=0> tau_squared_spatial_bernoulli;
+
     real<lower=0> tau_squared_temporal;
 }
 
 transformed parameters {
     vector[no_data] mu;                                                   // Mean of Negative Binomial distribution
+    vector[no_data] pi;                                                   // probability for structured zero
     matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X1_penalized;
                                                                           // covariance matrix corresponding to penalized spline 
                                                                           // coefficients for X1
@@ -505,9 +511,12 @@ transformed parameters {
     matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X7_penalized;
                                                                           // covariance matrix corresponding to penalized spline 
                                                                           // coefficients for X2   
-    matrix[no_countries, no_countries] covariance_matrix_spatial_effects;
-    matrix[no_seasons, no_seasons] covariance_matrix_temporal_effects;
 
+    matrix[no_countries, no_countries] covariance_matrix_spatial_effects;
+    matrix[no_countries, no_countries] covariance_matrix_spatial_effects_bernoulli;
+
+    matrix[no_seasons, no_seasons] covariance_matrix_temporal_effects;
+    
     mu = exp(intercept + 
              basis_X1 * polynomial_space_matrix_X1 * spline_coefficients_X1_non_penalized +
              basis_X1 * random_effects_matrix_X1 * spline_coefficients_X1_penalized + 
@@ -527,7 +536,11 @@ transformed parameters {
              temporal_data * temporal_coefficients
              );
                                                                     //taking exponential as a link function of a GAM
+                                                                    
+    pi = inv_logit(spatial_data * spatial_coefficients_bernoulli);
 
+
+                                                   //taking exponential as a link function of a GAM
     covariance_matrix_X1_penalized = tau_squared_X1 * diag_matrix(rep_vector(1, no_basis-random_walk_order));       
                                                                     // Defining covariance matrix of penalized spline 
                                                                     // coefficients for X1 
@@ -551,6 +564,8 @@ transformed parameters {
                                                                     // coefficients for X2 
 
     covariance_matrix_spatial_effects = tau_squared_spatial * diag_matrix(rep_vector(1, no_countries));
+    covariance_matrix_spatial_effects_bernoulli = tau_squared_spatial_bernoulli * diag_matrix(rep_vector(1, no_countries));
+
     covariance_matrix_temporal_effects = tau_squared_temporal * diag_matrix(rep_vector(1, no_seasons));
                                                              
 }
@@ -561,11 +576,13 @@ model {
     tau_squared_X2 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X3 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X4 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
-    tau_squared_X5 ~ inv_gamma(a_tau_squared, b_tau_squared);    
+    tau_squared_X5 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X6 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X7 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
-    // Inverse Gamma prior for tau_squared
+
     tau_squared_spatial ~ inv_gamma(a_tau_squared_spatial, b_tau_squared_spatial);
+    tau_squared_spatial_bernoulli ~ inv_gamma(a_tau_squared_spatial, b_tau_squared_spatial);
+
     tau_squared_temporal ~ inv_gamma(a_tau_squared_temporal, b_tau_squared_temporal);
     b_alpha ~ gamma(alpha_b_alpha, beta_b_alpha);
     alpha ~ gamma(a_alpha, b_alpha);                                 // Gamma prior for alpha
@@ -585,16 +602,28 @@ model {
     spline_coefficients_X7_penalized ~ multi_normal(rep_vector(0, no_basis-random_walk_order), covariance_matrix_X7_penalized);
 
     spatial_coefficients ~ multi_normal(rep_vector(0, no_countries), covariance_matrix_spatial_effects);
+    spatial_coefficients_bernoulli ~ multi_normal(rep_vector(0, no_countries), covariance_matrix_spatial_effects_bernoulli);
+
     temporal_coefficients ~ multi_normal(rep_vector(0, no_seasons), covariance_matrix_temporal_effects);
-
-    // Y ~ neg_binomial_2(mu, alpha);                                   // Likelihood
-    target += neg_binomial_2_lpmf(Y | mu, alpha);  // Explicitly specifying the log-PMF
+    
+    // Log likelihood
+    for (n in 1:no_data) {
+      if (Y[n] == 0) {
+        target += log_sum_exp(log(pi[n]), 
+                            log1m(pi[n]) 
+                              + neg_binomial_2_lpmf(0 | mu[n], alpha));
+      } else {
+        target += log1m(pi[n]) 
+                  + neg_binomial_2_lpmf(Y[n] | mu[n], alpha);
+      }
+    }
 }
-
 generated quantities {
    int y_pred_train[no_data];
    int y_pred_eval[no_data_eval];
+
    vector[no_data_eval] mu_eval;
+   vector[no_data_eval] pi_eval;
    
    mu_eval = exp(intercept + 
                basis_X1_eval * polynomial_space_matrix_X1 * spline_coefficients_X1_non_penalized +
@@ -614,11 +643,17 @@ generated quantities {
                spatial_data_eval * spatial_coefficients +
                temporal_data_eval * temporal_coefficients
                );
+               
+   pi_eval = inv_logit(spatial_data_eval * spatial_coefficients_bernoulli);
+
    
+   // Generate predictions for training data
    for (n in 1:no_data) {
-       y_pred_train[n] = neg_binomial_2_rng(mu[n], alpha);
+       y_pred_train[n] = bernoulli_rng(pi[n]) ? 0 : neg_binomial_2_rng(mu[n], alpha);
    }
+   
+   // Generate predictions for evaluation data
    for (n_eval in 1:no_data_eval) {
-       y_pred_eval[n_eval] = neg_binomial_2_rng(mu_eval[n_eval], alpha);
+       y_pred_eval[n_eval] = bernoulli_rng(pi_eval[n_eval]) ? 0 : neg_binomial_2_rng(mu_eval[n_eval], alpha);
    }
 }

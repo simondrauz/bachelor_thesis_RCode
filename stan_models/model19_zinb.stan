@@ -250,6 +250,66 @@ functions {
     
     return mat;
   }
+  matrix generate_brooks_lemma_matrix(matrix spatial_adjacency_matrix);
+  matrix generate_brooks_lemma_matrix(matrix spatial_adjacency_matrix){
+    //
+    // DOCSTRING:
+    //    Generate Brook's Lemma matrix for reparametrization of spatial adjacency matrix
+    //
+    // INPUTS
+    //    spatial_adjacency_matrix: adjacency matrix with [s,r] = -1 if countries s and r are neighbors
+    //                                                    [s,s] = |N(s)| as the number of neighbors of s
+    //                                                and 0 otherwise.
+    int no_rows = rows(spatial_adjacency_matrix);
+    int no_cols = cols(spatial_adjacency_matrix);
+    matrix[no_rows, no_cols] brooks_lemma_matrix;  // Initialize an empty matrix
+    
+    for (s in 1:no_rows){
+        for (r in 1:no_cols){
+            if (spatial_adjacency_matrix[s, r] == -1){
+                brooks_lemma_matrix[s, r] = 1.0 / spatial_adjacency_matrix[s, s];
+            } else {
+                brooks_lemma_matrix[s, r] = spatial_adjacency_matrix[s, r];
+            }
+        }
+    }
+    
+    // Set diagonal elements
+    for (i in 1:no_rows){
+        brooks_lemma_matrix[i, i] = 0;
+    }
+    
+    return brooks_lemma_matrix;
+  }
+  matrix generate_spatial_inv_identity_matrix(matrix spatial_adjacency_matrix);
+  matrix generate_spatial_inv_identity_matrix(matrix spatial_adjacency_matrix){
+    //
+    // DOCSTRING:
+    //
+    // Generates diagonal matrix which takes the inverse of diagonal elements of the spatial_adjacency_matrix as 
+    // diagonal elements
+    //
+    // for countries without neigbors we set the element to 1, which should reflect a tau_squared of the unstructured approach
+    int no_rows = rows(spatial_adjacency_matrix);
+    int no_cols = cols(spatial_adjacency_matrix);
+    matrix[no_rows, no_cols] spatial_inv_identity_matrix;
+    
+      
+    for (i in 1:no_rows) {
+      for (j in 1:no_cols) {
+        if (i == j) {
+          if (spatial_adjacency_matrix[i, j] == 0.0){
+            spatial_inv_identity_matrix[i, j] = 1.0;
+          } else{
+            spatial_inv_identity_matrix[i, j] = spatial_adjacency_matrix[i, j];
+          }
+        } else {
+          spatial_inv_identity_matrix[i, j] = 0.0;
+        }
+      }
+    }
+  return spatial_inv_identity_matrix;
+  }
 }
 
 data {
@@ -259,8 +319,10 @@ data {
     
     
     int<lower=1> no_basis;                     // dimension of our basis matrix for covariate modelled without intercept 
-    int<lower=1>no_interior_knots;             // no of interior knots for covariate
-    int<lower=1>random_walk_order;             // Order of the random walk for covariate
+    int<lower=1> no_interior_knots;             // no of interior knots for covariate
+    int<lower=1> random_walk_order;             // Order of the random walk for covariate
+    
+    int<lower=1> no_lin_covariates; 
     
     real covariate_data_X1[no_data] ;             // data corresponding to covariate X1
     real covariate_data_X1_eval[no_data_eval];    // evaluation data corresponding to covariate X1
@@ -277,35 +339,34 @@ data {
     
     real covariate_data_X5[no_data];              // compare covariate_X1 for X2 respectivly
     real covariate_data_X5_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
-
+    
     real covariate_data_X6[no_data];              // compare covariate_X1 for X2 respectivly
     real covariate_data_X6_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
     
     real covariate_data_X7[no_data];              // compare covariate_X1 for X2 respectivly
     real covariate_data_X7_eval[no_data_eval];    // compare covariate_X1 for X2 respectivly
-
+    
+    matrix[no_data, no_lin_covariates] covariate_data_linear;
+    matrix[no_data_eval, no_lin_covariates] covariate_data_linear_eval;
+    
     int no_countries;
     matrix[no_data, no_countries] spatial_data;       // one hot encoding for countries
-    matrix[no_data_eval, no_countries] spatial_data_eval ;
-    int no_seasons;
-    matrix[no_data, no_seasons] temporal_data;
-    matrix[no_data_eval, no_seasons] temporal_data_eval;
+    matrix[no_data_eval, no_countries] spatial_data_eval;
     
     
     int Y[no_data];                               // Observed Target variable
     int Y_eval[no_data_eval];                     // Observed Target variable for evaluation
+    matrix[no_countries, no_countries] spatial_adjacency_matrix; // Adjacency matrix containing spatial dependencies
     
     real a_tau_squared;                                // Shape parameter for InverseGamma of tau for covariate
     real b_tau_squared;                                // Scale parameter for InverseGamma of tau for covariate
     real a_tau_squared_spatial;                                // Shape parameter for InverseGamma of tau for spatial effects 
-    real b_tau_squared_spatial;                                // Scale parameter for InverseGamma of tau for spatial effects 
-    real a_tau_squared_temporal;                                // Shape parameter for InverseGamma of tau for temporal effects
-    real b_tau_squared_temporal;                                // Scale parameter for InverseGamma of tau for temporal effects
+    real b_tau_squared_spatial;                                // Scale parameter for InverseGamma of tau for spatial effects
     real a_alpha;                                 // Shape parameter for Gamma of alpha
     real alpha_b_alpha;
     real beta_b_alpha;                                 // Scale parameter for Gamma of alpha
-    real intercept_mu;                            // Mean of intercept prior
-    real<lower=0> intercept_sigma;                // Standard deviation of intercept prior
+    real alpha_rho;                               // Parameters for Beta distribution of rho
+    real beta_rho;
 }
 
 transformed data {
@@ -339,7 +400,7 @@ transformed data {
   matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X5;
   matrix[no_basis, no_basis-random_walk_order] random_effects_matrix_X5;
   matrix[no_basis, random_walk_order] polynomial_space_matrix_X5;
- 
+
   matrix[no_data, no_basis] basis_X6;
   matrix[no_data_eval, no_basis] basis_X6_eval;
   matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X6;
@@ -351,7 +412,10 @@ transformed data {
   matrix[no_basis-random_walk_order, no_basis] difference_matrix_first_order_X7;
   matrix[no_basis, no_basis-random_walk_order] random_effects_matrix_X7;
   matrix[no_basis, random_walk_order] polynomial_space_matrix_X7;
-  
+   
+  matrix[no_countries, no_countries] brooks_lemma_matrix;
+  matrix[no_countries, no_countries] spatial_inv_identity_matrix;
+ 
   // Generate design matrix of regression splines for covariate X1
   basis_X1 = generate_spline_basis_matrix(covariate_data_X1, spline_degree, no_interior_knots, no_data, no_basis);
   // Generate design matrix of evaluation regression splines for covariate X1
@@ -420,7 +484,6 @@ transformed data {
   // Generate polynominal space matrix of covarariate X2
   polynomial_space_matrix_X6 = generate_polynomial_space_matrix(no_basis, random_walk_order);
 
-
   // Generate design matrix of regression splines for covariate X2
   basis_X7 = generate_spline_basis_matrix(covariate_data_X7, spline_degree, no_interior_knots, no_data, no_basis); 
   // Generate design matrix of evaluation regression splines for covariate X2
@@ -431,6 +494,13 @@ transformed data {
   random_effects_matrix_X7 = generate_random_effects_matrix(difference_matrix_first_order_X7);
   // Generate polynominal space matrix of covarariate X2
   polynomial_space_matrix_X7 = generate_polynomial_space_matrix(no_basis, random_walk_order);
+  
+  // Generate Brook's Lemma matrix for reparametrization of spatial adjacency matrix
+  brooks_lemma_matrix = generate_brooks_lemma_matrix(spatial_adjacency_matrix);
+  // Generate spatial adjacency matrix
+  spatial_inv_identity_matrix = generate_spatial_inv_identity_matrix(spatial_adjacency_matrix); 
+  
+
 }
 
 parameters {
@@ -458,6 +528,7 @@ parameters {
                                                                    // Penalized spline coefficients for X2
     vector[random_walk_order] spline_coefficients_X5_non_penalized;
                                                                    // Non-penalized spline coefficients for X2
+
     vector[no_basis-random_walk_order] spline_coefficients_X6_penalized;                    
                                                                    // Penalized spline coefficients for X2
     vector[random_walk_order] spline_coefficients_X6_non_penalized;
@@ -469,8 +540,8 @@ parameters {
                                                                    // Non-penalized spline coefficients for X2
     vector[no_countries] spatial_coefficients;                      // spatial coefficients
     vector[no_countries] spatial_coefficients_bernoulli;                      // spatial coefficients
-
-    vector[no_seasons] temporal_coefficients;                       // temporal coefficients
+    
+    vector[no_lin_covariates] linear_coefficients;
 
     
     real<lower=0> tau_squared_X1;                                          // Precision parameter for Gaussian random walk for covariate
@@ -485,8 +556,8 @@ parameters {
     real<lower=0> b_alpha;
     real<lower=0> tau_squared_spatial;
     real<lower=0> tau_squared_spatial_bernoulli;
-
-    real<lower=0> tau_squared_temporal;
+    real<lower=0, upper=1> rho_spatial;
+    real<lower=0, upper=1> rho_spatial_bernoulli;
 }
 
 transformed parameters {
@@ -513,11 +584,9 @@ transformed parameters {
     matrix[no_basis-random_walk_order, no_basis-random_walk_order] covariance_matrix_X7_penalized;
                                                                           // covariance matrix corresponding to penalized spline 
                                                                           // coefficients for X2   
-
-    matrix[no_countries, no_countries] covariance_matrix_spatial_effects;
-    matrix[no_countries, no_countries] covariance_matrix_spatial_effects_bernoulli;
-
-    matrix[no_seasons, no_seasons] covariance_matrix_temporal_effects;
+    
+    matrix[no_countries, no_countries] precision_matrix_spatial_effects;          
+    matrix[no_countries, no_countries] precision_matrix_spatial_effects_bernoulli;
     
     mu = exp(intercept + 
              basis_X1 * polynomial_space_matrix_X1 * spline_coefficients_X1_non_penalized +
@@ -535,7 +604,7 @@ transformed parameters {
              basis_X7 * polynomial_space_matrix_X7 * spline_coefficients_X7_non_penalized +
              basis_X7 * random_effects_matrix_X7 * spline_coefficients_X7_penalized +
              spatial_data * spatial_coefficients +
-             temporal_data * temporal_coefficients
+             covariate_data_linear * linear_coefficients
              );
                                                                     //taking exponential as a link function of a GAM
                                                                     
@@ -564,17 +633,15 @@ transformed parameters {
     covariance_matrix_X7_penalized = tau_squared_X7 * diag_matrix(rep_vector(1, no_basis-random_walk_order));       
                                                                     // Defining covariance matrix of penalized spline 
                                                                     // coefficients for X2 
+    
+    precision_matrix_spatial_effects = (1/ tau_squared_spatial) * spatial_inv_identity_matrix * (diag_matrix(rep_vector(1, no_countries)) - rho_spatial * brooks_lemma_matrix);     
 
-    covariance_matrix_spatial_effects = tau_squared_spatial * diag_matrix(rep_vector(1, no_countries));
-    covariance_matrix_spatial_effects_bernoulli = tau_squared_spatial_bernoulli * diag_matrix(rep_vector(1, no_countries));
-
-    covariance_matrix_temporal_effects = tau_squared_temporal * diag_matrix(rep_vector(1, no_seasons));
+    precision_matrix_spatial_effects_bernoulli = (1 / tau_squared_spatial_bernoulli) * spatial_inv_identity_matrix * (diag_matrix(rep_vector(1, no_countries)) - rho_spatial_bernoulli * brooks_lemma_matrix);
                                                              
 }
 
 model {
   // Priors
-    intercept ~ normal(intercept_mu, intercept_sigma);               // Diffuse prior for intercept
     tau_squared_X1 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X2 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
     tau_squared_X3 ~ inv_gamma(a_tau_squared, b_tau_squared);                           // Inverse Gamma prior for tau_squared
@@ -585,8 +652,12 @@ model {
 
     tau_squared_spatial ~ inv_gamma(a_tau_squared_spatial, b_tau_squared_spatial);
     tau_squared_spatial_bernoulli ~ inv_gamma(a_tau_squared_spatial, b_tau_squared_spatial);
+    
+    // Set rho which is used in reparametrization of spatial_dependency_matrix (this is possibly prelimiinary)
+    rho_spatial ~ beta(alpha_rho, beta_rho);
+    rho_spatial_bernoulli ~ beta(alpha_rho, beta_rho);
 
-    tau_squared_temporal ~ inv_gamma(a_tau_squared_temporal, b_tau_squared_temporal);
+    
     b_alpha ~ gamma(alpha_b_alpha, beta_b_alpha);
     alpha ~ gamma(a_alpha, b_alpha);                                 // Gamma prior for alpha
 
@@ -604,10 +675,10 @@ model {
                                                                      // Prior for spline coefficients for X2  
     spline_coefficients_X7_penalized ~ multi_normal(rep_vector(0, no_basis-random_walk_order), covariance_matrix_X7_penalized);
 
-    spatial_coefficients ~ multi_normal(rep_vector(0, no_countries), covariance_matrix_spatial_effects);
-    spatial_coefficients_bernoulli ~ multi_normal(rep_vector(0, no_countries), covariance_matrix_spatial_effects_bernoulli);
+    spatial_coefficients ~ multi_normal_prec(rep_vector(0, no_countries), precision_matrix_spatial_effects);
+    spatial_coefficients_bernoulli ~ multi_normal_prec(rep_vector(0, no_countries), precision_matrix_spatial_effects_bernoulli);
+    
 
-    temporal_coefficients ~ multi_normal(rep_vector(0, no_seasons), covariance_matrix_temporal_effects);
     
     // Log likelihood
     for (n in 1:no_data) {
@@ -644,7 +715,7 @@ generated quantities {
                basis_X7_eval * polynomial_space_matrix_X7 * spline_coefficients_X7_non_penalized +
                basis_X7_eval * random_effects_matrix_X7 * spline_coefficients_X7_penalized +
                spatial_data_eval * spatial_coefficients +
-               temporal_data_eval * temporal_coefficients
+               covariate_data_linear_eval * linear_coefficients
                );
                
    pi_eval = inv_logit(spatial_data_eval * spatial_coefficients_bernoulli);
