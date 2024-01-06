@@ -142,23 +142,27 @@ compute_CRPS_with_package <- function(fit_extract, df_eval, country_mapping) {
 
 
 # Load Fit
-load("stan_fits/fit_fatalities_bigger_0.RData")
-load("stan_fits/fit_zinb_all_fatalities.RData")
-fit <- fit_parallel
+load("stan_fits/fit_model1_nb_feature_set1Apr2018.RData")
+load("stan_fits/fit_model1_nb_Apr2018.RData")
+load("stan_fits/model15_zinb_feature_set1/fit_model15_zinb_feature_set1_Mar2018_composed.RData")
+load("stan_fits/fit_zinb_it2_all_fatalities.RData")
+
+fit_zinb_all <- fit
+rm(fit_Mar)
 # Extract sample from fit
-posterior_incl_warmup_combined <- rstan::extract(fit_zinb_parallel, inc_warmup = TRUE, permuted = TRUE)
+posterior_incl_warmup_combined <- rstan::extract(fit, inc_warmup = TRUE, permuted = TRUE)
 # Extract sample from fit without warmup
-posterior_excl_warmup_combined <- rstan::extract(fit_zinb_parallel, inc_warmup = FALSE, permuted = TRUE)
+posterior_excl_warmup_combined <- rstan::extract(fit, inc_warmup = FALSE, permuted = TRUE)
 pp_eval <-posterior_excl_warmup_combined$y_pred_eval
 # Inclusive warm_up
-posterior_incl_warmup <- rstan::extract(fit_parallel, inc_warmup = TRUE, permuted = FALSE)
+posterior_incl_warmup <- rstan::extract(fit, inc_warmup = TRUE, permuted = FALSE)
 
 # Seems to only take the samples, not the warmup
-posterior <- as.matrix(fit_parallel)
+posterior <- as.matrix(fit)
 
 # Get fit information including convergence statistics as a table
-fit_summary <- summary(fit_parallel)
-fit_summary_table <- summary(fit_parallel)$summary
+fit_summary <- summary(fit)
+fit_summary_table <- summary(fit)$summary
 
 # Load the country mapping from the CSV file
 country_mapping <- read.csv("country_list.csv", stringsAsFactors = FALSE)
@@ -178,6 +182,9 @@ rstan::traceplot(fit_zinb_parallel, pars= c("tau_squared", "tau_squared_spatial"
 rstan::traceplot(fit_zinb_parallel, pars= "intercept", inc_warmup=TRUE)
 rstan::traceplot(fit_zinb_parallel, pars= "b_alpha", inc_warmup=TRUE)
 rstan::traceplot(fit_zinb_parallel, pars= c("intercept","alpha", "b_alpha", "tau_squared", "tau_squared_spatial", "tau_squared_temporal"), inc_warmup=TRUE)
+
+rstan::traceplot(fit_Mar, pars= c("mu_eval[0]"), inc_warmup=TRUE)
+
 
 rstan::traceplot(fit_zinb_parallel, pars= "spline_coefficients_X1_penalized", inc_warmup=TRUE)
 rstan::traceplot(fit_zinb_parallel, pars= "spline_coefficients_X1_non_penalized", inc_warmup=TRUE)
@@ -283,22 +290,22 @@ bayesplot::mcmc_areas(posterior,
 # scatter plot also showing divergences (don't really know how valuabel)
 color_scheme_set("darkgray")
 mcmc_scatter(
-  as.matrix(fit_parallel),
+  as.matrix(fit_nb_all),
   pars = c("alpha", "tau_squared"), 
-  np = nuts_params(fit_parallel), 
+  np = nuts_params(fit_nb_all), 
   np_style = scatter_style_np(div_color = "green", div_alpha = 0.8)
 )
 
 # Nuts energy plot
 color_scheme_set("red")
 np <- nuts_params(fit_zinb_parallel)
-mcmc_nuts_energy(np) + ggtitle("NUTS Energy Diagnostic")
+mcmc_nuts_energy(np) + ggtitle("NUTS Energy Diagnostic - ZINB All Jan parallel")
 
 # Obtain number of divergences
-divergences <- rstan::get_sampler_params(fit_parallel, inc_warmup = FALSE)$divergent__
+divergences <- rstan::get_sampler_params(fit_nb_all, inc_warmup = FALSE)$divergent__
 num_divergences <- sum(divergences)
 print(num_divergences)
-rstan::check_hmc_diagnostics(fit_parallel)
+rstan::check_hmc_diagnostics(fit)
 
 
 # EXPLORATIVE
@@ -334,7 +341,7 @@ ggplot(posterior_country_long, aes(x = observed, y = predicted)) +
        x = "Observed Data (ged_sb)", y = "Posterior Predictive Sample")
 
 # Extract samples
-posterior_samples <- rstan::extractact(fit_parallel, permuted = TRUE)
+posterior_samples <- rstan::extractact(fit, permuted = TRUE)
 y_rep_train <- fit_extract$y_pred_train
 dim(y_rep_train)
 y_rep_eval <- fit_extract$y_pred_eval

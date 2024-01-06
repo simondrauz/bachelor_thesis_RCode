@@ -4,7 +4,7 @@ library(rstan)
 
 stan_fit_dir = "E:/stan_fits/"
 data_dir_path = "C:/Users/Uwe Drauz/Documents/bachelor_thesis_local/personal_competition_data/data/"
-feature_set = 'feature_set4'
+feature_set = 'feature_set3'
 data_path <- paste0(data_dir_path, "cm_features_allyears_", feature_set, ".parquet")
 data <- read_parquet(data_path)
 eval_months <- c(457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468)
@@ -16,7 +16,7 @@ eval_months_names <- c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', '
 # eval_months_names <- c('Jan', 'Mar', 'Apr', 'May')
 # eval_months_names <- c('Jan', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Dec')
 
-model_name = 'model15_zinb_feature_set1'
+model_name = 'model19_zinb_feature_set3'
 crps_dfs <- list()
 pps_list <- list()
 
@@ -249,7 +249,7 @@ load(paste0(stan_fit_dir, model_name, '/', 'fit_', model_name, '_', 'Jan', '2018
 
 fit_summary <- summary(fit_Jan)
 
-model15_results <- read_parquet("C:/Users/Uwe Drauz/Documents/bachelor_thesis_local/personal_competition_data/Results/model15_zinb_feature_set1_crps_df_averages.parquet")
+model19_results <- read_parquet("C:/Users/Uwe Drauz/Documents/bachelor_thesis_local/personal_competition_data/Results/model19_zinb_feature_set3_crps_df_averages.parquet")
 model_15_scores <- read_parquet(paste0("C:/Users/Uwe Drauz/Documents/bachelor_thesis_local/personal_competition_data/Results/", model_name, "_crps_df_averages.parquet"))
 
 load(paste0(stan_fit_dir, model_name, '/', 'fit_', model_name, '_', 'Aug', '2018_composed.RData'))
