@@ -6,19 +6,19 @@ library(latex2exp)
 library(arrow)
 
 # Define the models and their associated fit files
-# models <- c('model13_nb_feature_set1', 'model3_zinb_feature_set1', 'model1_zinb_feature_set1', 
-#            'model4_zinb_feature_set1', 'model15_zinb_feature_set1', 'model19_zinb_feature_set3', 
-#            'model23_zinb_feature_set4')
+models <- c('model13_nb_feature_set1', 'model3_zinb_feature_set1', 'model1_zinb_feature_set1', 
+            'model4_zinb_feature_set1', 'model15_zinb_feature_set1', 'model19_zinb_feature_set3', 
+            'model23_zinb_feature_set4')
 
-models <- c('model15_zinb_feature_set1')
+# models <- c('model4_zinb_feature_set1')
 
 # models <- c('model3_zinb_feature_set1', 'model1_zinb_feature_set1', 
 #            'model4_zinb_feature_set1', 'model15_zinb_feature_set1')
 
 # Define the list of scientific identifiers for the models
-# scientific_model_identifiers <- c('$M_{1}$', '$M_{2}$', '$M_{3}$', 
-#                                  '$M_{4}$', '$M_{5}$', '$M_{6}$', '$M_{7}$')
-scientific_model_identifiers <- c('$M_{5}$')
+scientific_model_identifiers <- c('$M_{1}$', '$M_{2}$', '$M_{3}$', 
+                                  '$M_{4}$', '$M_{5}$', '$M_{6}$', '$M_{7}$')
+# scientific_model_identifiers <- c('$M_{4}$')
 # scientific_model_identifiers <- c('$M_{2}$', '$M_{3}$', 
 #                                 '$M_{4}$', '$M_{5}$')
 # Initialize a dataframe to store results
@@ -91,7 +91,7 @@ process_fit <- function(fit, model_name, model_identifier, month, generate_trace
   if (model_name == 'model13_nb_feature_set1') {
     exclude_pattern <- "mu|mu_eval"
   } else if (model_name == 'model4_zinb_feature_set1') {
-    exclude_pattern <- "mu|mu_eval|pi|pi_eval"
+    exclude_pattern <- "mu|mu_eval"
   } else {
     exclude_pattern <- "mu|mu_eval|pi|pi_eval"
   }
@@ -162,7 +162,7 @@ process_fit <- function(fit, model_name, model_identifier, month, generate_trace
   energy_plot <- mcmc_nuts_energy(np) + 
     ggtitle(latex2exp::TeX(paste("NUTS Energy Plot - ", model_identifier, " - ", month)))
   
-  plot_file <- sprintf("stan_fits/NUTS_energy_plots/energy_plot_%s_%s.png", model_name, month)
+  plot_file <- sprintf("stan_fits/NUTS_energy_plots/%s/energy_plot_%s_%s.png", model_name, model_name, month)
   ggsave(plot_file, energy_plot, width = 8, height = 6)  
   # Call plot_trace_plots if requested
   if (generate_trace_plots && !is.null(countries) && !is.null(indices)) {
@@ -188,7 +188,7 @@ plot_trace_plots <- function(fit, model_name, model_identifier, month, countries
       pars_title_name <- c('\\mu', '\\alpha')
     }
     else if(model_name=='model4_zinb_feature_set1'){
-      pars_to_plot <- c(paste0("mu_eval[", index, "]"), 'pi_eval', 'alpha')
+      pars_to_plot <- c(paste0("mu_eval[", index, "]"), 'pi', 'alpha')
       pars_title_name <- c('\\mu', '\\pi', '\\alpha')
     }
     else{
@@ -210,7 +210,7 @@ plot_trace_plots <- function(fit, model_name, model_identifier, month, countries
       p_separate <- rstan::traceplot(fit, pars = par, inc_warmup = TRUE) + ggtitle(title_separate)
       
       
-      ggsave(sprintf("stan_fits/trace_plots/separate_trace_plot_%s_%s_%s_%s_%s.png", model_name, month, year, country, par), 
+      ggsave(sprintf("stan_fits/trace_plots/%s/separate_trace_plot_%s_%s_%s_%s_%s.png", model_name, model_name, month, year, country, par), 
              p_separate, 
              width = 8, 
              height = 4)
@@ -233,7 +233,7 @@ country_indices <- c(53, 179, 211, 310, 14)
 for (i in seq_along(models)) {
   model <- models[i]
   model_identifier <- scientific_model_identifiers[i]
-  for (month in c("Jan")) {
+  for (month in c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) {
     print(paste0('Reading Fit of ', model, ' and ', month, '...'))
     file_path <- sprintf("E:/stan_fits/%s/fit_%s_%s2018_composed.RData", model, model, month)
     load(file_path)
@@ -247,18 +247,42 @@ for (i in seq_along(models)) {
 
 
 write_parquet(results, 'stan_fits/results_convergence_assessment.parquet')
+library(dplyr)
+library(lubridate)
+# Convert AvgTotalTimePerChain to seconds
+results$AvgTotalTimePerChain <- sapply(strsplit(results$AvgTotalTimePerChain, ":"), 
+                                    function(time) {
+                                      hours <- as.numeric(time[1])
+                                      minutes <- as.numeric(time[2])
+                                      seconds <- as.numeric(time[3])
+                                      return(hours * 3600 + minutes * 60 + seconds)
+                                    })
+
+# Group by Model and calculate means
+grouped_results <- results %>%
+  group_by(Model) %>%
+  summarise(
+    MeanNumberRhatAbove1.1All = mean(NumberRhatAbove1.1All, na.rm = TRUE),
+    MeanNumNumberESSBelowThresholdAll = mean(NumNumberESSBelowThresholdAll, na.rm = TRUE),
+    MeanNumberRhatAbove1.1Filtered = mean(NumberRhatAbove1.1Filtered, na.rm = TRUE),
+    MeanNumNumberESSBelowThresholdFiltered = mean(NumNumberESSBelowThresholdFiltered, na.rm = TRUE),
+    MeanAvgTotalTimePerChain = mean(AvgTotalTimePerChain, na.rm = TRUE),
+    MeanNumberOfChains = mean(NumberOfChains, na.rm = TRUE)
+  )
+
+write_csv_arrow(results, 'stan_fits/results_convergence_assessment.csv')
 c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-#mcmc_trace(fit_Jan, pars = "mu_eval[53]", 
+# mcmc_trace(fit_Jan, pars = "mu_eval[53]", 
 #           main = expression(paste("Trace plot for ", alpha, " - ", country, " - ", month, " - ", year)))
-#mu_eval_data <- as.data.frame(fit_Jan)$mu_eval[53]
+# mu_eval_data <- as.data.frame(fit_Jan)$mu_eval[53]
 rm(fit_Jan)
-load('E:/stan_fits/model15_zinb_feature_set1/fit_model15_zinb_feature_set1_Jan2018_composed.RData')
-rstan::traceplot(fit_Jan, pars= "alpha", inc_warmup=TRUE) + ggtitle("Your Desired Title Here")
-for (i in seq_along(models)){
-  print(i)
-}
-results_prev <- results
+# load('E:/stan_fits/model15_zinb_feature_set1/fit_model15_zinb_feature_set1_Jan2018_composed.RData')
+# rstan::traceplot(fit_Jan, pars= "alpha", inc_warmup=TRUE) + ggtitle("Your Desired Title Here")
+# for (i in seq_along(models)){
+#  print(i)
+# }
+# results_prev <- results
 # Alternatively, you can use the format function when printing or outputting the dataframe
 results_formatted <- data.frame(lapply(results, function(x) {
   if(is.numeric(x)) format(x, scientific = FALSE) else x
